@@ -67,3 +67,6 @@ node_modules/
 
 # Built
 build/
+
+# Run file
+run.bat
