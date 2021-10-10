@@ -1,0 +1,43 @@
+.loginPage {
+    background-color: rgb(232, 83, 51);    
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    & > form {
+        background-color: white;
+        width: 400px;
+        height: 300px;
+        display: flex;
+        padding: 30px;
+        justify-content: center;
+        flex-direction: column;
+        border-radius: 20px;
+
+        h1 {
+            margin: 0 auto 70px auto;
+        }
+
+        button {
+            margin-top: 10px;
+            border: 1px solid rgb(232, 83, 51);
+            padding: 3px;
+            color: rgb(232, 83, 51);
+            transition: 0.1s;
+            font-size: large;
+            width: 100%;
+
+            &:hover {
+                background-color: rgb(232, 83, 51);
+                color: white;
+            }
+        }
+
+        p {
+            color:red;
+            margin: 0 auto;
+        }
+    }
+}

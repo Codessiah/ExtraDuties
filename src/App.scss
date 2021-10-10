@@ -1,0 +1,69 @@
+body, form, h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+    font-family: 'Gemunu Libre', sans-serif;
+
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+*[disabled] {
+    pointer-events: none;
+}
+
+button {
+    font-family: 'Gemunu Libre', sans-serif;
+    font-size: medium;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: transparent;
+    border: 0;
+    width: fit-content;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.overlay {
+    position: fixed;
+    display: flex;
+    justify-content: center;
+    padding: 0;
+    align-items: center;
+    z-index: 30;
+    right: 0;
+    background-color: rgba(black, 0.6);
+    color: white;
+    font-size: larger;
+    & > form {
+        width: 40vw;
+        height: 80vh;
+        background-color: white;
+    }
+}
+
+*[hidden] { 
+    width: 0.1px;
+    height: 0.1px;
+    opacity: 0;
+    overflow: hidden;
+    position: absolute;
+    z-index: -1;
+}
+
+input {
+    font-size: medium;
+    margin: 2px;
+    min-width: 0;
+    padding: 5px;
+    border: 1px solid rgb(172, 172, 172);
+    font-family: 'Gemunu Libre', sans-serif;
+
+    &:focus, textarea:focus, select:focus {
+        outline: none;
+        border: 1px solid black;
+    }
+}
