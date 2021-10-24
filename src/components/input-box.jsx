@@ -3,10 +3,11 @@ import date from 'date-and-time';
 export default function InputBox({ v, inputBoxes, type, name }) {
     if (type === "text") return <input defaultValue={v.data()[name]} name={name} type="text" ref={inputBoxes[name]} />
 
-    let rawtime = new Date(v.data()["start"].toDate().toISOString());
+    let localStart = v.data().start.toDate();
+    let localEnd = v.data().end.toDate();
 
-    let dateValue = date.format(rawtime, "YYYY-MM-DD");
-    let timeValue = date.format(rawtime, "hh:mm");
+    let dateValue = date.format(localStart, "YYYY-MM-DD");
+    let timeValue = date.format(name === "end" ? localEnd : localStart, "HH:mm");
 
     if (type === "date") return <input defaultValue={dateValue} name={name} type="date" ref={inputBoxes[name]} />
 

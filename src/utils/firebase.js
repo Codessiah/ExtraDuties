@@ -19,5 +19,6 @@ const users = collection(firestore, "users");
 const roles = collection(firestore, "roles");
 const events = collection(firestore, "events");
 const settings = collection(firestore, "settings");
+const passwords = collection(firestore, "passwords");
 
-export { auth, users, roles, events, settings };
+export { auth, users, roles, events, settings, passwords };

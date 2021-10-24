@@ -3,7 +3,7 @@ import judgeRole from "../utils/judge-role";
 import SiteContext from "../utils/site-context";
 import InputBox from "./input-box";
 
-export default function UserBox({ v, i, editing, setEditing, saveUserChanges, removeUser, rolesCache, userPromotion }) {
+export default function UserBox({ v, i, editing, setEditing, saveUserChanges, removeUser, rolesCache, userPromotion, copyPassword }) {
     let { userRole } = useContext(SiteContext);
 
     let inputBoxes = {
@@ -88,14 +88,6 @@ export default function UserBox({ v, i, editing, setEditing, saveUserChanges, re
             <div className="actions">
                 {userRole > localRole ? (
                     <>
-                        {userRole > 1 && localRole === 0 && v.data().setup ? (
-                            <button title="Promote" onClick={() => userPromotion(i)}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="blue" className="bi bi-arrow-up-circle" viewBox="0 0 16 16">
-                                    <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-7.5 3.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V11.5z" />
-                                </svg>
-                            </button>
-                        ) : undefined}
-
                         {!v.data().setup ? (
                             <>
                                 <button title="Edit" onClick={() => setEditing(i)}>
@@ -110,6 +102,20 @@ export default function UserBox({ v, i, editing, setEditing, saveUserChanges, re
                                     </svg>
                                 </button>
                             </>
+                        ) : (
+                            <button title="Copy Password" onClick={() => copyPassword(i)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-key-fill" viewBox="0 0 16 16">
+                                    <path d="M3.5 11.5a3.5 3.5 0 1 1 3.163-5H14L15.5 8 14 9.5l-1-1-1 1-1-1-1 1-1-1-1 1H6.663a3.5 3.5 0 0 1-3.163 2zM2.5 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" />
+                                </svg>
+                            </button>
+                        )}
+
+                        {userRole > 1 && localRole === 0 && v.data().setup ? (
+                            <button title="Promote" onClick={() => userPromotion(i)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="blue" className="bi bi-arrow-up-circle" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8zm15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-7.5 3.5a.5.5 0 0 1-1 0V5.707L5.354 7.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 5.707V11.5z" />
+                                </svg>
+                            </button>
                         ) : undefined}
                     </>
                 ) : undefined}

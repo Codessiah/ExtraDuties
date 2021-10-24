@@ -17,6 +17,7 @@ export default function ComboBox({ onMenuSelect }) {
             { value: "mine", label: "Mine" },
             { value: "empty", label: "Empty" },
         ]}
+        className="rselect"
         onChange={handleChange}
     />
 }

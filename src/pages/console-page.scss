@@ -36,7 +36,7 @@
         height: 100vh;
         overflow: auto;
 
-        & > div {margin: 30px;}
+        & > div { margin: 30px }
 
         .title {
             width: 100%;
@@ -97,6 +97,15 @@
 
     &.admin {
         .events {
+            .rselect {
+                position: fixed;
+                top: 0;
+                right: 0;
+                margin: 15px;
+                width: 400px;
+                z-index: 20;
+            }
+
             .yes {
                 display: grid;
                 grid-template-columns: 1fr 1fr 1fr 2fr 1fr 1fr 1fr 1fr;
@@ -170,6 +179,8 @@
         }
 
         .users {
+            .rselect { padding-top: 10px }
+
             .yes {
                 display: grid;
                 grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
@@ -241,15 +252,12 @@
                 }
             }
         }
-
-        .settings {
-
-        }
     }
 
     &.user {
         .events {
             padding-top: 10px;
+
             .yes {
                 display: grid;
                 grid-template-columns: 1fr 1fr 1fr 2fr 1fr 1fr 1fr;

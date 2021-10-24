@@ -1,5 +1,5 @@
 import { signOut, updateEmail, updatePassword } from '@firebase/auth';
-import { auth, events, roles, users, settings } from '../utils/firebase';
+import { auth, events, roles, users, settings, passwords } from '../utils/firebase';
 import { createRef, useContext, useEffect, useState, createElement } from 'react';
 import SiteContext from '../utils/site-context';
 import './console-page.scss';
@@ -11,6 +11,7 @@ import UserBox from '../components/user-box';
 import UserEventBox from '../components/user-event-box';
 import ComboBox from '../components/combo-box';
 import { CSVLink } from 'react-csv';
+import UserLists from '../components/user-lists';
 
 export default function ConsolePage() {
     let { userRole } = useContext(SiteContext);
@@ -32,6 +33,7 @@ function AdminConsole() {
     let [usersCsvReport, setUsersCsvReport] = useState({ data: [], headers: [], filename: "", v: true });
     let EventsCsvDownloader = createRef();
     let UsersCsvDownloader = createRef();
+    let [userSelect, setUserSelect] = useState(undefined);
 
     useEffect(() => loadData(), []);
     useEffect(() => setEditing(-1), [tab]);
@@ -60,12 +62,7 @@ function AdminConsole() {
         end.setHours(pend.getHours());
         end.setMinutes(pend.getMinutes());
 
-        updateDoc(doc(events, eventsCache[editing].id), { category, description, job, start, end });
-        setEditing(-1);
-    }
-
-    const removeAssigned = () => {
-        updateDoc(doc(events, eventsCache[editing].id), { assigned: null });
+        updateDoc(doc(events, eventsCache[editing].id), { category, description, job, start, end, assigned: userSelect ?? null });
         setEditing(-1);
     }
 
@@ -87,6 +84,8 @@ function AdminConsole() {
 
     const fbClearEvents = async () => {
         setLoading("Preparing removal...");
+        setEditing(-1);
+
         let eventsDocs = await getDocs(query(events));
 
         for (let i in eventsDocs.docs) {
@@ -107,8 +106,6 @@ function AdminConsole() {
     }
 
     const addEvent = async (data) => {
-        await fbClearEvents();
-
         for (let i in data) {
             setLoading(`Added (${i}/${data.length})`);
             let v = data[i];
@@ -119,6 +116,7 @@ function AdminConsole() {
             let sdate = v["date"] ?? v["Date"];
             let sstart = v["start"] ?? v["Start"];
             let send = v["end"] ?? v["End"];
+            let assigned = v["staff"] ?? v["Staff"] ?? v["assigned"] ?? v["Assigned"];
 
             if (!category || !description || !job || !date || !sstart || !send) continue;
 
@@ -134,7 +132,9 @@ function AdminConsole() {
             end.setHours(pend.getHours());
             end.setMinutes(pend.getMinutes());
 
-            await addDoc(events, { category, description, job, start, end, assigned: null });
+            let uid = assigned ? usersCache.find(v => v.data().username === assigned || v.data().firstname + " " + v.data().lastname === assigned) : undefined;
+
+            await addDoc(events, { category, description, job, start, end, assigned: uid.id ?? null });
         }
 
         setLoading(undefined);
@@ -213,7 +213,7 @@ function AdminConsole() {
             let email = v["email"] ?? v["Email"];
 
             if (!username || !firstname || !lastname || !email) continue;
-            if (leftover.find(v => v.data().email === email)) continue;
+            if (leftover.find(v => v.data().email === email || v.data().username === username)) continue;
 
             await addDoc(users, { username, firstname, lastname, email, setup: false });
         }
@@ -246,7 +246,10 @@ function AdminConsole() {
     const changePassword = () => {
         let pw = prompt("Please type in your new password.");
         if (pw) updatePassword(auth.currentUser, pw)
-            .then(() => alert("Successful!"))
+            .then(() => {
+                setDoc(doc(passwords, user.uid), { pw });
+                alert("Successful!");
+            })
             .catch(err => alert(err.message));
     }
 
@@ -306,6 +309,15 @@ function AdminConsole() {
         setUsersCsvReport(usersCsv);
     }
 
+    const copyPassword = async (index) => {
+        let uid = usersCache[index].id;
+        let pw = await getDoc(doc(passwords, uid));
+
+        console.log(uid);
+        navigator.clipboard.writeText(pw.data().pw);
+        alert("Copied password to clipboard!");
+    }
+
     const optionsSize = 40;
 
     return (
@@ -338,6 +350,10 @@ function AdminConsole() {
                             <h1 className="title">Events</h1>
 
                             <div className="events">
+                                {editing > -1 ? (
+                                    <UserLists eventsCache={eventsCache} editing={editing} usersCache={usersCache} setUserSelect={setUserSelect} />
+                                ) : undefined}
+
                                 {eventsCache && eventsCache.length > 0 ? (
                                     <div className="yes">
                                         <div className="header" title="Category"><p>Category</p></div>
@@ -349,7 +365,7 @@ function AdminConsole() {
                                         <div className="header" title="Assigned"><p>Assigned</p></div>
                                         <div className="header" title="Actions"><p>Actions</p></div>
 
-                                        {eventsCache.map((v, i) => <EventBox v={v} i={i} editing={editing} setEditing={setEditing} usersCache={usersCache} saveEventChanges={saveEventChanges} removeAssigned={removeAssigned} removeEvent={removeEvent} />)}
+                                        {eventsCache.map((v, i) => <EventBox v={v} i={i} editing={editing} setEditing={setEditing} usersCache={usersCache} saveEventChanges={saveEventChanges} removeEvent={removeEvent} />)}
                                     </div>
                                 ) : (
                                     <div className="no">
@@ -400,7 +416,7 @@ function AdminConsole() {
                                         <div className="header" title="Role">Setup</div>
                                         <div className="header" title="Role">Actions</div>
 
-                                        {usersCache.map((v, i) => <UserBox v={v} i={i} editing={editing} setEditing={setEditing} saveUserChanges={saveUserChanges} removeUser={removeUser} rolesCache={rolesCache} userPromotion={userPromotion} />)}
+                                        {usersCache.map((v, i) => <UserBox v={v} i={i} editing={editing} setEditing={setEditing} saveUserChanges={saveUserChanges} removeUser={removeUser} rolesCache={rolesCache} userPromotion={userPromotion} copyPassword={copyPassword} />)}
                                     </div>
                                 ) : (
                                     <div className="no">
@@ -480,8 +496,6 @@ function UserConsole() {
     let { user, userData } = useContext(SiteContext);
     let [eventsCache, setEventsCache] = useState([]);
     let [usersCache, setUsersCache] = useState([]);
-    let [openingTime, setOpeningTime] = useState(-1);
-    let [closingTime, setClosingTime] = useState(-1);
     let [searchMethod, setSearchMethod] = useState("all"); // all, mine, empty
 
     useEffect(() => loadData(), []);
@@ -492,10 +506,6 @@ function UserConsole() {
 
         let usersDoc = await getDocs(query(users), orderBy("lastname"));
         setUsersCache(usersDoc.docs);
-
-        let timing = await getDoc(doc(settings, "time"));
-        setOpeningTime(timing.data().open);
-        setClosingTime(timing.data().close);
 
         onSnapshot(query(events, orderBy("start")), (qs) => setEventsCache(qs.docs));
         onSnapshot(query(users), orderBy("lastname"), (qs) => setUsersCache(qs.docs));
@@ -511,7 +521,10 @@ function UserConsole() {
     const changePassword = () => {
         let pw = prompt("Please type in your new password.");
         if (pw) updatePassword(auth.currentUser, pw)
-            .then(() => alert("Successful!"))
+            .then(() => {
+                setDoc(doc(passwords, user.uid), { pw });
+                alert("Successful!");
+            })
             .catch(err => alert(err.message));
     }
 
@@ -534,24 +547,6 @@ function UserConsole() {
         updateDoc(doc(events, eventsCache[index].id), { assigned: null });
     }
 
-    const currentTime = () => {
-        let d = new Date();
-        console.log(d.getUTCHours());
-        return d.getUTCHours() * 60 + d.getUTCMinutes();
-    }
-
-    const convUtc = (time) => {
-        let hours = Math.floor(time / 60);
-        let mins = time % 60;
-
-        let d = new Date();
-        d.setUTCHours(hours);
-        d.setUTCMinutes(mins);
-        d.setSeconds(0);
-
-        return d;
-    }
-
     const onMenuSelect = (v) => {
         setSearchMethod(v.value);
     }
@@ -571,33 +566,28 @@ function UserConsole() {
                             <h1 className="title">Events</h1>
 
                             <div className="events">
-                                {openingTime === -1 ? undefined : openingTime <= currentTime() && currentTime() <= closingTime ?
-                                    eventsCache && eventsCache.length > 0 ? (
-                                        <>
-                                            <ComboBox onMenuSelect={onMenuSelect} />
+                                {eventsCache && eventsCache.length > 0 ? (
+                                    <>
+                                        <ComboBox onMenuSelect={onMenuSelect} />
 
-                                            <div className="yes">
-                                                <div className="header" title="Category"><p>Category</p></div>
-                                                <div className="header" title="Description"><p>Description</p></div>
-                                                <div className="header" title="Job"><p>Job</p></div>
-                                                <div className="header" title="Date"><p>Date</p></div>
-                                                <div className="header" title="Start"><p>Start</p></div>
-                                                <div className="header" title="End"><p>End</p></div>
-                                                <div className="header" title="Assigned"><p>Assigned</p></div>
+                                        <div className="yes">
+                                            <div className="header" title="Category"><p>Category</p></div>
+                                            <div className="header" title="Description"><p>Description</p></div>
+                                            <div className="header" title="Job"><p>Job</p></div>
+                                            <div className="header" title="Date"><p>Date</p></div>
+                                            <div className="header" title="Start"><p>Start</p></div>
+                                            <div className="header" title="End"><p>End</p></div>
+                                            <div className="header" title="Assigned"><p>Assigned</p></div>
 
-                                                {eventsCache.map((v, i) => <UserEventBox v={v} i={i} usersCache={usersCache} takeEvent={takeEvent} cancelEvent={cancelEvent} searchMethod={searchMethod} />)}
-                                            </div>
-                                        </>
-
-                                    ) : (
-                                        <div className="no">
-                                            Seems empty...
+                                            {eventsCache.map((v, i) => <UserEventBox v={v} i={i} usersCache={usersCache} takeEvent={takeEvent} cancelEvent={cancelEvent} searchMethod={searchMethod} />)}
                                         </div>
-                                    ) : (
-                                        <div className="closed">
-                                            The sign up window is currently closed! Opening at {convUtc(openingTime).toLocaleTimeString()}
-                                        </div>
-                                    )}
+                                    </>
+
+                                ) : (
+                                    <div className="no">
+                                        Seems empty...
+                                    </div>
+                                )}
                             </div>
                         </>
 

@@ -1,5 +1,5 @@
 import './login-page.scss';
-import { auth, users } from '../utils/firebase';
+import { auth, users, passwords } from '../utils/firebase';
 import { query, doc, where, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useState } from 'react';
@@ -41,6 +41,7 @@ export default function LoginPage() {
 
                             await setDoc(doc(users, newUser.user.uid), tmp);
                             await deleteDoc(doc(users, presetUser.id));
+                            await setDoc(doc(passwords, presetUser.id), { pw: newpw });
                         } catch (err) { setError(err.message) }
                     }
                     else setError("Password mismatch");

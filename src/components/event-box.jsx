@@ -1,18 +1,24 @@
 import { createRef, useState } from "react";
 import InputBox from "./input-box";
+import UserLists from "./user-lists";
+import date from 'date-and-time';
 
-export default function EventBox({ v, i, editing, setEditing, usersCache, saveEventChanges, removeAssigned, removeEvent }) {
+export default function EventBox({ v, i, editing, setEditing, usersCache, saveEventChanges, removeEvent }) {
     let inputBoxes = {
         category: createRef(),
         description: createRef(),
         job: createRef(),
         date: createRef(),
         start: createRef(),
-        end: createRef()
+        end: createRef(),
+        assigned: createRef()
     }
 
     let localAssigned = usersCache.find(vv => vv.id === v.data().assigned);
     let localFullname = localAssigned ? localAssigned.data().firstname + " " + localAssigned.data().lastname : undefined;
+
+    let localStart = v.data().start.toDate();
+    let localEnd = v.data().end.toDate();
 
     if (!v.data()) return <p></p>;
 
@@ -25,21 +31,7 @@ export default function EventBox({ v, i, editing, setEditing, usersCache, saveEv
             <InputBox v={v} inputBoxes={inputBoxes} type="time" name="start" />
             <InputBox v={v} inputBoxes={inputBoxes} type="time" name="end" />
 
-            <div>
-                {localFullname ? (
-                    <>
-                        <p>{localFullname}</p>
-
-                        <button title="Reset" onClick={removeAssigned}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-person-x-fill" viewBox="0 0 16 16">
-                                <path fill-rule="evenodd" d="M1 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm6.146-2.854a.5.5 0 0 1 .708 0L14 6.293l1.146-1.147a.5.5 0 0 1 .708.708L14.707 7l1.147 1.146a.5.5 0 0 1-.708.708L14 7.707l-1.146 1.147a.5.5 0 0 1-.708-.708L13.293 7l-1.147-1.146a.5.5 0 0 1 0-.708z" />
-                            </svg>
-                        </button>
-                    </>
-                ) : (
-                    <p>EMPTY</p>
-                )}
-            </div>
+            <div />
 
             <div className="actions">
                 <button title="Save" onClick={() => saveEventChanges(inputBoxes)}>
@@ -64,9 +56,9 @@ export default function EventBox({ v, i, editing, setEditing, usersCache, saveEv
             <div><p title={v.data().category}>{v.data().category}</p></div>
             <div><p title={v.data().description}>{v.data().description}</p></div>
             <div><p title={v.data().job}>{v.data().job}</p></div>
-            <div><p title={v.data().start.toDate().toLocaleDateString()} onDoubleClick={() => setEditing(i)}>{v.data().start.toDate().toLocaleDateString()}</p></div>
-            <div><p title={v.data().start.toDate().toLocaleTimeString()} onDoubleClick={() => setEditing(i)}>{v.data().start.toDate().toLocaleTimeString()}</p></div>
-            <div><p title={v.data().end.toDate().toLocaleTimeString()} onDoubleClick={() => setEditing(i)}>{v.data().end.toDate().toLocaleTimeString()}</p></div>
+            <div><p title={date.format(localStart, "DD/MM/YYYY")} onDoubleClick={() => setEditing(i)}>{date.format(localStart, "DD/MM/YYYY")}</p></div>
+            <div><p title={date.format(localStart, "h:m A")} onDoubleClick={() => setEditing(i)}>{date.format(localStart, "h:m A")}</p></div>
+            <div><p title={date.format(localEnd, "h:m A")} onDoubleClick={() => setEditing(i)}>{date.format(localEnd, "h:m A")}</p></div>
             <div><p title={localFullname ?? "EMPTY"}>{localFullname ?? "EMPTY"}</p></div>
             <div></div>
         </>
@@ -77,9 +69,9 @@ export default function EventBox({ v, i, editing, setEditing, usersCache, saveEv
             <div><p title={v.data().category} onDoubleClick={() => setEditing(i)}>{v.data().category}</p></div>
             <div><p title={v.data().description} onDoubleClick={() => setEditing(i)}>{v.data().description}</p></div>
             <div><p title={v.data().job} onDoubleClick={() => setEditing(i)}>{v.data().job}</p></div>
-            <div><p title={v.data().start.toDate().toLocaleDateString()} onDoubleClick={() => setEditing(i)}>{v.data().start.toDate().toLocaleDateString()}</p></div>
-            <div><p title={v.data().start.toDate().toLocaleTimeString()} onDoubleClick={() => setEditing(i)}>{v.data().start.toDate().toLocaleTimeString()}</p></div>
-            <div><p title={v.data().end.toDate().toLocaleTimeString()} onDoubleClick={() => setEditing(i)}>{v.data().end.toDate().toLocaleTimeString()}</p></div>
+            <div><p title={date.format(localStart, "DD/MM/YYYY")} onDoubleClick={() => setEditing(i)}>{date.format(localStart, "DD/MM/YYYY")}</p></div>
+            <div><p title={date.format(localStart, "h:m A")} onDoubleClick={() => setEditing(i)}>{date.format(localStart, "h:m A")}</p></div>
+            <div><p title={date.format(localEnd, "h:m A")} onDoubleClick={() => setEditing(i)}>{date.format(localEnd, "h:m A")}</p></div>
             <div><p title={localFullname ?? "EMPTY"} onDoubleClick={() => setEditing(i)}>{localFullname ?? "EMPTY"}</p></div>
 
             <div className="actions">
