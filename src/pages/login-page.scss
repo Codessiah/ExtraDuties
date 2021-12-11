@@ -1,5 +1,5 @@
 .loginPage {
-    background-color: rgb(232, 83, 51);    
+    background-image: linear-gradient(#EE5F48, #E85333);
     width: 100vw;
     height: 100vh;
     display: flex;
@@ -9,35 +9,42 @@
     & > form {
         background-color: white;
         width: 400px;
-        height: 300px;
         display: flex;
         padding: 30px;
         justify-content: center;
         flex-direction: column;
         border-radius: 20px;
+        padding: 50px;
 
         h1 {
-            margin: 0 auto 70px auto;
+            margin: 0 auto;
+            font-size: 48px;
+            color: #514441;
+            font-weight: bold;
+            margin-bottom: 40px;
         }
 
         button {
-            margin-top: 10px;
-            border: 1px solid rgb(232, 83, 51);
-            padding: 3px;
-            color: rgb(232, 83, 51);
+            border: 1px solid #E23713;
+            background-color: #E23713;
+            color: white;
+            padding: 6px;
             transition: 0.1s;
-            font-size: large;
+            font-size: 16px;
             width: 100%;
+            border-radius: 6px;
+            margin-bottom: 20px;
 
             &:hover {
-                background-color: rgb(232, 83, 51);
-                color: white;
+                background-color: white;
+                color: #E23713
             }
         }
 
         p {
-            color:red;
-            margin: 0 auto;
+            color: #EE5F48;
+            font-size: 14px;
+            text-align: center;
         }
     }
 }

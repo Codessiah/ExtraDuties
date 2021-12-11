@@ -1,7 +1,5 @@
-import './unknown-page.scss';
-
 export default function UnknownPage() {
     return (
-        <div>404</div>
+        <div>Error 404</div>
     );
 }

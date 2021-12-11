@@ -1,33 +1,45 @@
 import { useContext } from "react";
 import SiteContext from "../utils/site-context";
+import EmptyText from "./empty-text";
+import date from 'date-and-time';
 
-export default function UserEventBox({ v, i, usersCache, takeEvent, cancelEvent, searchMethod }) {
+export default function UserEventBox({ v, i, usersCache, takeEvent, cancelEvent, searchMethod, settingsCache, localReg }) {
     let { user } = useContext(SiteContext);
     let localAssigned = usersCache.find(vv => vv.id === v.data().assigned);
     let localFullname = localAssigned ? localAssigned.data().firstname + " " + localAssigned.data().lastname : undefined;
 
-    if (!v.data()) return <></>;
+    let localStart = v.data().start.toDate();
+    let localEnd = v.data().end.toDate();
+
     if (searchMethod === "mine" && v.data().assigned !== user.uid) return <></>;
     if (searchMethod === "empty" && localAssigned) return <></>;
 
+    function AdvBox({ name }) {
+        return v.data()[name] === "" ? <EmptyText /> : <p title={v.data()[name]}>{v.data()[name]}</p>
+    }
+
     return (
         <>
-            <div><p title={v.data().category} >{v.data().category}</p></div>
-            <div><p title={v.data().description} >{v.data().description}</p></div>
-            <div><p title={v.data().job} >{v.data().job}</p></div>
-            <div><p title={v.data().start.toDate().toLocaleDateString()} >{v.data().start.toDate().toLocaleDateString()}</p></div>
-            <div><p title={v.data().start.toDate().toLocaleTimeString()} >{v.data().start.toDate().toLocaleTimeString()}</p></div>
-            <div><p title={v.data().end.toDate().toLocaleTimeString()} >{v.data().end.toDate().toLocaleTimeString()}</p></div>
+            <AdvBox name="category" />
+            <AdvBox name="description" />
+            <AdvBox name="job" />
+
+            <p title={date.format(localStart, "MM/DD/YYYY")}>{date.format(localStart, "MM/DD/YYYY")}</p>
+
+            <p title={date.format(localStart, "h:mm A")}><p><p>{date.format(localStart, "h:mm")}</p><p style={{ fontWeight: "bold", marginLeft: 5 }}>{date.format(localStart, "A")}</p></p></p>
+            <p title={date.format(localEnd, "h:mm A")}><p><p>{date.format(localEnd, "h:mm")}</p><p style={{ fontWeight: "bold", marginLeft: 5 }}>{date.format(localEnd, "A")}</p></p></p>
 
             <div className="assigned">
-                <p title={localFullname}>{localFullname}</p>
+                {localFullname ? <p title={localFullname}>{localFullname}</p> : undefined}
 
                 {localFullname ? localAssigned.id === user.uid ? (
-                    <button className="cancel" onClick={() => cancelEvent(i)}>CANCEL</button>
-                ) : undefined : (
-                    <button className="take" onClick={() => takeEvent(i)}>TAKE</button>
-                )}
+                    <button className="cancel" onClick={() => cancelEvent(i)}>Cancel</button>
+                ) : undefined(
+                    <button className="take" onClick={() => takeEvent(i)}>Take</button>
+                ) : undefined}
             </div>
+
+            <p />
         </>
     );
 }

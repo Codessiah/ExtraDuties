@@ -3,7 +3,7 @@ import { auth, events, roles, users, settings, passwords } from '../utils/fireba
 import { createRef, useContext, useEffect, useState, createElement } from 'react';
 import SiteContext from '../utils/site-context';
 import './console-page.scss';
-import { addDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, setDoc, updateDoc } from '@firebase/firestore';
+import { addDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, setDoc, updateDoc, where } from '@firebase/firestore';
 import EventBox from '../components/event-box';
 import Papa from 'papaparse';
 import date from 'date-and-time';
@@ -12,6 +12,9 @@ import UserEventBox from '../components/user-event-box';
 import ComboBox from '../components/combo-box';
 import { CSVLink } from 'react-csv';
 import UserLists from '../components/user-lists';
+import Nav from '../components/navigator';
+import MenuList from '../utils/menu-list';
+import moment from 'moment';
 
 export default function ConsolePage() {
     let { userRole } = useContext(SiteContext);
@@ -25,6 +28,7 @@ function AdminConsole() {
     let [eventsCache, setEventsCache] = useState([]);
     let [usersCache, setUsersCache] = useState([]);
     let [rolesCache, setRolesCache] = useState([]);
+    let [settingsCache, setSettingsCache] = useState([]);
     let [editing, setEditing] = useState(-1);
     let [loading, setLoading] = useState(undefined);
     let fileRef = createRef();
@@ -34,15 +38,18 @@ function AdminConsole() {
     let EventsCsvDownloader = createRef();
     let UsersCsvDownloader = createRef();
     let [userSelect, setUserSelect] = useState(undefined);
+    let [searchMethod, setSearchMethod] = useState("all");
 
     useEffect(() => loadData(), []);
-    useEffect(() => setEditing(-1), [tab]);
-    useEffect(() => generateCsv(), [eventsCache, usersCache]);
+    useEffect(() => generateCsv(), [eventsCache, usersCache, searchMethod]);
+
+    let menu = MenuList();
 
     const loadData = async () => {
         onSnapshot(query(events, orderBy("start")), (qs) => setEventsCache(qs.docs));
         onSnapshot(query(users), orderBy("lastname"), (qs) => setUsersCache(qs.docs));
         onSnapshot(query(roles), (qs) => setRolesCache(qs.docs));
+        onSnapshot(query(settings), (qs) => setSettingsCache(qs.docs[0].data()));
     }
 
     const saveEventChanges = (inputBoxes) => {
@@ -123,8 +130,9 @@ function AdminConsole() {
             let start = new Date(sdate);
             let end = new Date(sdate);
 
-            let pstart = date.parse(sstart, "HH:mm:ss");
-            let pend = date.parse(send, "HH:mm:ss");
+            // TODO format check
+            let pstart = date.parse(sstart, "HH:mm");
+            let pend = date.parse(send, "HH:mm");
 
             start.setHours(pstart.getHours());
             start.setMinutes(pstart.getMinutes());
@@ -132,9 +140,11 @@ function AdminConsole() {
             end.setHours(pend.getHours());
             end.setMinutes(pend.getMinutes());
 
-            let uid = assigned ? usersCache.find(v => v.data().username === assigned || v.data().firstname + " " + v.data().lastname === assigned) : undefined;
+            let uid = assigned !== "" ? usersCache.find(v => v.data().username === assigned || v.data().firstname + " " + v.data().lastname === assigned) : undefined;
 
-            await addDoc(events, { category, description, job, start, end, assigned: uid.id ?? null });
+            if (uid) uid = uid.id;
+
+            await addDoc(events, { category, description, job, start, end, assigned: uid ?? null });
         }
 
         setLoading(undefined);
@@ -161,6 +171,9 @@ function AdminConsole() {
     }
 
     const userPromotion = (index) => {
+        let q = confirm("Are you sure you want to promote this user?");
+        if (!q) return;
+
         setDoc(doc(roles, usersCache[index].id), { isAdmin: true, isSuperAdmin: false });
     }
 
@@ -265,16 +278,32 @@ function AdminConsole() {
     }
 
     const generateCsv = () => {
+        let visibleEvents = eventsCache.filter(v => {
+            let now = moment();
+            let tstart = moment(v.data().start.toDate());
+
+            if (searchMethod === "coming_up" && tstart < now) return false;
+            if (searchMethod === "taken" && !v.data().assigned) return false;
+            if (searchMethod === "empty" && v.data().assigned) return false;
+            if (searchMethod === "this_week" && now.isoWeek() !== tstart.isoWeek()) return false;
+
+            return true;
+        });
+
         let eventsCsv = {
-            data: eventsCache.map(v => new Object({
-                category: v.data().category,
-                description: v.data().description,
-                job: v.data().job,
-                date: date.format(v.data().start.toDate(), "MM/DD/YYYY"),
-                start: date.format(v.data().start.toDate(), "HH:mm:ss"),
-                end: date.format(v.data().end.toDate(), "HH:mm:ss"),
-                assigned: v.data().assigned,
-            })),
+            data: visibleEvents.map(v => {
+                let localAssigned = usersCache.find(vv => vv.id === v.data().assigned);
+
+                return {
+                    category: v.data().category,
+                    description: v.data().description,
+                    job: v.data().job,
+                    date: date.format(v.data().start.toDate(), "MM/DD/YYYY"),
+                    start: date.format(v.data().start.toDate(), "HH:mm"),
+                    end: date.format(v.data().end.toDate(), "HH:mm"),
+                    assigned: localAssigned ? localAssigned.data().username : null
+                }
+            }),
             headers: [
                 { label: "Category", key: "category" },
                 { label: "Description", key: "description" },
@@ -288,12 +317,13 @@ function AdminConsole() {
         }
 
         let usersCsv = {
-            data: usersCache.map(v => new Object({
+            data: usersCache.map(v => ({
                 username: v.data().username,
                 firstname: v.data().firstname,
                 lastname: v.data().lastname,
                 email: v.data().email,
-                setup: v.data().setup ? "Y" : "N"
+                setup: v.data().setup ? "Y" : "N",
+                reg: eventsCache.filter(vv => vv.data().assigned === v.id).length
             })),
             headers: [
                 { label: "Username", key: "username" },
@@ -301,6 +331,7 @@ function AdminConsole() {
                 { label: "Lastname", key: "lastname" },
                 { label: "Email", key: "email" },
                 { label: "Setup", key: "setup" },
+                { label: "Registered", key: "reg" }
             ],
             filename: `Extra Duties Users Report: ${date.format(new Date(), "MM/DD/YYYY")}.csv`
         }
@@ -313,12 +344,30 @@ function AdminConsole() {
         let uid = usersCache[index].id;
         let pw = await getDoc(doc(passwords, uid));
 
-        console.log(uid);
         navigator.clipboard.writeText(pw.data().pw);
         alert("Copied password to clipboard!");
     }
 
-    const optionsSize = 40;
+    const toValidISOString = (d) => {
+        let nd = date.format(d, "YYYY-MM-DDThh:mm");
+        return nd;
+    }
+
+    const saveSettings = (e) => {
+        e.preventDefault();
+
+        let opening = date.parse(e.target.opening.value, "YYYY-MM-DDThh:mm");
+        let requiredJobs = Number(e.target.requiredJobs.value);
+
+        setDoc(doc(settings, "current"), { opening, requiredJobs }).then(() => alert("Successful!"));
+    }
+
+    const onMenuSelect = (v) => {
+        setSearchMethod(v.value);
+    }
+
+    // Loading
+    if (!eventsCache || !usersCache || !rolesCache || !settingsCache) return <></>
 
     return (
         <div className="consolePage admin">
@@ -327,163 +376,132 @@ function AdminConsole() {
             <CSVLink {...eventsCsvReport} ref={EventsCsvDownloader} />
             <CSVLink {...usersCsvReport} ref={UsersCsvDownloader} />
 
-            <nav>
-                <div className={tab === 0 ? "selected" : ""} onClick={() => setTab(0)}>Events</div>
-                <div className={tab === 1 ? "selected" : ""} onClick={() => setTab(1)}>Users</div>
-                <div className={tab === 2 ? "selected" : ""} onClick={() => setTab(2)}>Profile</div>
-                <div className={tab === 3 ? "selected" : ""} onClick={() => setTab(3)}>Settings</div>
-                <div onClick={() => signOut(auth)}>Sign Out</div>
-            </nav>
+            <Nav {...{ tab, setTab, setEditing, setSearchMethod }} signOut={() => signOut(auth)} />
 
-            {
-                loading ? (
-                    <div className="overlay">
-                        <p>{loading}</p>
-                    </div>
-                ) : undefined
-            }
+            {loading ? (
+                <div className="overlay">
+                    <p>{loading}</p>
+                </div>
+            ) : undefined}
 
             <div>
                 <div>
+                    <h1 className="title">{menu[tab]}</h1>
+
                     {tab === 0 ? (
-                        <>
-                            <h1 className="title">Events</h1>
+                        <div className="events">
+                            <ComboBox onMenuSelect={onMenuSelect} menus={["All", "Coming Up", "Taken", "Empty", "This Week"]} />
 
-                            <div className="events">
-                                {editing > -1 ? (
-                                    <UserLists eventsCache={eventsCache} editing={editing} usersCache={usersCache} setUserSelect={setUserSelect} />
-                                ) : undefined}
+                            {editing > -1 ? (
+                                <UserLists eventsCache={eventsCache} editing={editing} usersCache={usersCache} setUserSelect={setUserSelect} />
+                            ) : undefined}
 
-                                {eventsCache && eventsCache.length > 0 ? (
-                                    <div className="yes">
-                                        <div className="header" title="Category"><p>Category</p></div>
-                                        <div className="header" title="Description"><p>Description</p></div>
-                                        <div className="header" title="Job"><p>Job</p></div>
-                                        <div className="header" title="Date"><p>Date</p></div>
-                                        <div className="header" title="Start"><p>Start</p></div>
-                                        <div className="header" title="End"><p>End</p></div>
-                                        <div className="header" title="Assigned"><p>Assigned</p></div>
-                                        <div className="header" title="Actions"><p>Actions</p></div>
+                            <div className="container">
+                                {eventsCache.length > 0 ? (
+                                    <div className="filled">
+                                        <p className="header">Category</p>
+                                        <p className="header">Description</p>
+                                        <p className="header">Job</p>
+                                        <p className="header">Date</p>
+                                        <p className="header">Start</p>
+                                        <p className="header">End</p>
+                                        <p className="header">Assigned</p>
+                                        <p className="header">Actions</p>
+                                        <p className="header" />
 
-                                        {eventsCache.map((v, i) => <EventBox v={v} i={i} editing={editing} setEditing={setEditing} usersCache={usersCache} saveEventChanges={saveEventChanges} removeEvent={removeEvent} />)}
+                                        {eventsCache.map((v, i) => <EventBox {...{ v, i, editing, setEditing, usersCache, saveEventChanges, removeEvent, searchMethod }} />)}
                                     </div>
                                 ) : (
-                                    <div className="no">
+                                    <div className="empty">
                                         Seems empty...
                                     </div>
                                 )}
-
-                                <div className="options">
-                                    <button onClick={addNewEvent} title="Add new event" >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" class="bi bi-plus" viewBox="0 0 16 16">
-                                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
-                                        </svg>
-                                    </button>
-
-                                    <button onClick={clearAllEvent} title="Clear all events">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" className="bi bi-trash2" viewBox="0 0 16 16">
-                                            <path d="M14 3a.702.702 0 0 1-.037.225l-1.684 10.104A2 2 0 0 1 10.305 15H5.694a2 2 0 0 1-1.973-1.671L2.037 3.225A.703.703 0 0 1 2 3c0-1.105 2.686-2 6-2s6 .895 6 2zM3.215 4.207l1.493 8.957a1 1 0 0 0 .986.836h4.612a1 1 0 0 0 .986-.836l1.493-8.957C11.69 4.689 9.954 5 8 5c-1.954 0-3.69-.311-4.785-.793z" />
-                                        </svg>
-                                    </button>
-
-                                    <button onClick={fileUploadAction} title="Upload events spreadsheet" >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" class="bi bi-file-earmark-arrow-up" viewBox="0 0 16 16">
-                                            <path d="M8.5 11.5a.5.5 0 0 1-1 0V7.707L6.354 8.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L8.5 7.707V11.5z" />
-                                            <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z" />
-                                        </svg>
-                                    </button>
-
-                                    <button onClick={() => EventsCsvDownloader.current.link.click()} title="Download events report">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" className="bi bi-download" viewBox="0 0 16 16">
-                                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
-                                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
-                                        </svg>
-                                    </button>
-                                </div>
                             </div>
-                        </>
+
+                            <div className="options">
+                                <button onClick={addNewEvent} title="Add new event" ><img src="/icons/plus.svg" /></button>
+                                <button onClick={clearAllEvent} title="Clear all events"><img src="/icons/trash2.svg" /></button>
+
+                                <button onClick={fileUploadAction} title="Upload events spreadsheet" ><img src="/icons/file-earmark-arrow-up.svg" /></button>
+
+                                <button onClick={() => EventsCsvDownloader.current.link.click()} title="Download events report"><img src="/icons/download.svg" /></button>
+                            </div>
+                        </div>
                     ) : tab === 1 ? (
-                        <>
-                            <h1 className="title">Users</h1>
+                        <div className="users">
+                            <ComboBox onMenuSelect={onMenuSelect} menus={["All", "Met Quota", "Below Quota"]} />
 
-                            <div className="users">
+                            <div className="container">
                                 {usersCache && usersCache.length > 0 ? (
-                                    <div className="yes">
-                                        <div className="header" title="Username">Username</div>
-                                        <div className="header" title="First Name">First Name</div>
-                                        <div className="header" title="Last Name">Last Name</div>
-                                        <div className="header" title="Email">Email</div>
-                                        <div className="header" title="Role">Setup</div>
-                                        <div className="header" title="Role">Actions</div>
+                                    <div className="filled">
+                                        <p className="header">Username</p>
+                                        <p className="header">First Name</p>
+                                        <p className="header">Last Name</p>
+                                        <p className="header">Email</p>
+                                        <p className="header">Setup</p>
+                                        <p className="header">Registered</p>
+                                        <p className="header">Actions</p>
+                                        <p />
 
-                                        {usersCache.map((v, i) => <UserBox v={v} i={i} editing={editing} setEditing={setEditing} saveUserChanges={saveUserChanges} removeUser={removeUser} rolesCache={rolesCache} userPromotion={userPromotion} copyPassword={copyPassword} />)}
+                                        {usersCache.map((v, i) => <UserBox {...{ v, i, editing, setEditing, saveUserChanges, removeUser, rolesCache, userPromotion, copyPassword, searchMethod, eventsCache, settingsCache }} />)}
                                     </div>
                                 ) : (
-                                    <div className="no">
+                                    <div className="empty">
                                         Seems empty...
                                     </div>
                                 )}
-
-                                <div className="options">
-                                    <button onClick={addNewUser} title="Add new user" >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" class="bi bi-plus" viewBox="0 0 16 16">
-                                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z" />
-                                        </svg>
-                                    </button>
-
-                                    <button onClick={clearAllUser} title="Clear all users">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" className="bi bi-trash2" viewBox="0 0 16 16">
-                                            <path d="M14 3a.702.702 0 0 1-.037.225l-1.684 10.104A2 2 0 0 1 10.305 15H5.694a2 2 0 0 1-1.973-1.671L2.037 3.225A.703.703 0 0 1 2 3c0-1.105 2.686-2 6-2s6 .895 6 2zM3.215 4.207l1.493 8.957a1 1 0 0 0 .986.836h4.612a1 1 0 0 0 .986-.836l1.493-8.957C11.69 4.689 9.954 5 8 5c-1.954 0-3.69-.311-4.785-.793z" />
-                                        </svg>
-                                    </button>
-
-                                    <button onClick={fileUploadAction} title="Upload users spreadsheet" >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" class="bi bi-file-earmark-arrow-up" viewBox="0 0 16 16">
-                                            <path d="M8.5 11.5a.5.5 0 0 1-1 0V7.707L6.354 8.854a.5.5 0 1 1-.708-.708l2-2a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1-.708.708L8.5 7.707V11.5z" />
-                                            <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 3A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5v2z" />
-                                        </svg>
-                                    </button>
-
-                                    <button onClick={() => UsersCsvDownloader.current.link.click()} title="Download users list">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width={optionsSize} height={optionsSize} fill="rgb(232, 83, 51)" className="bi bi-download" viewBox="0 0 16 16">
-                                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z" />
-                                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z" />
-                                        </svg>
-                                    </button>
-                                </div>
                             </div>
-                        </>
-                    ) : tab === 2 ? (
-                        <>
-                            <h1 className="title">Profile</h1>
 
-                            <div className="profile">
+                            <div className="options">
+                                <button onClick={addNewUser} title="Add new user" ><img src="/icons/plus.svg" /></button>
+                                <button onClick={clearAllUser} title="Remove all users"><img src="/icons/trash2.svg" /></button>
+
+                                <button onClick={fileUploadAction} title="Upload users spreadsheet" ><img src="/icons/file-earmark-arrow-up.svg" /></button>
+
+                                <button onClick={() => UsersCsvDownloader.current.link.click()} title="Download users report"><img src="/icons/download.svg" /></button>
+                            </div>
+                        </div>
+                    ) : tab === 2 ? (
+                        <div className="profile">
+                            <div>
                                 <form onSubmit={newNames}>
                                     <div>
                                         <label>First Name</label>
-                                        <input name="first" placeholder="First Name" defaultValue={userData.firstname} />
+                                        <input key="first" name="first" placeholder="First Name" defaultValue={userData.firstname} />
                                     </div>
 
                                     <div>
                                         <label>Last Name</label>
-                                        <input name="last" placeholder="Last Name" defaultValue={userData.lastname} />
+                                        <input key="last" name="last" placeholder="Last Name" defaultValue={userData.lastname} />
                                     </div>
 
                                     <button>Save</button>
                                 </form>
 
-                                <button onClick={changeEmail}>Change Email</button>
-                                <button onClick={changePassword}>Change Password</button>
+                                <div>
+                                    <button onClick={changeEmail}>Change Email</button>
+                                    <button onClick={changePassword}>Change Password</button>
+                                </div>
                             </div>
-                        </>
+                        </div>
                     ) : (
-                        <>
-                            <h1 className="title">Settings</h1>
+                        <div className="settings">
+                            <div>
+                                <form onSubmit={saveSettings}>
+                                    <div>
+                                        <label>Opening Timestamp</label>
+                                        <input key="opening" type="datetime-local" name="opening" defaultValue={toValidISOString(settingsCache.opening.toDate())} />
+                                    </div>
 
-                            <div className="settings">
-                                <form></form>
+                                    <div>
+                                        <label>Required Jobs</label>
+                                        <input key="required" type="number" name="requiredJobs" min="0" defaultValue={settingsCache.requiredJobs} />
+                                    </div>
+
+                                    <button>Save</button>
+                                </form>
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
             </div>
@@ -496,19 +514,18 @@ function UserConsole() {
     let { user, userData } = useContext(SiteContext);
     let [eventsCache, setEventsCache] = useState([]);
     let [usersCache, setUsersCache] = useState([]);
+    let [settingsCache, setSettingsCache] = useState(undefined);
     let [searchMethod, setSearchMethod] = useState("all"); // all, mine, empty
 
     useEffect(() => loadData(), []);
 
+    let menu = MenuList();
+    let localReg = eventsCache.filter(v => v.data().assigned === user.uid).length;
+
     const loadData = async () => {
-        let eventsDoc = await getDocs(query(events, orderBy("start")));
-        setEventsCache(eventsDoc.docs);
-
-        let usersDoc = await getDocs(query(users), orderBy("lastname"));
-        setUsersCache(usersDoc.docs);
-
-        onSnapshot(query(events, orderBy("start")), (qs) => setEventsCache(qs.docs));
+        onSnapshot(query(events, orderBy("start"), where("start", ">=", new Date())), (qs) => setEventsCache(qs.docs));
         onSnapshot(query(users), orderBy("lastname"), (qs) => setUsersCache(qs.docs));
+        onSnapshot(query(settings), (qs) => setSettingsCache(qs.docs[0].data()));
     }
 
     const changeEmail = () => {
@@ -551,69 +568,71 @@ function UserConsole() {
         setSearchMethod(v.value);
     }
 
+    if (!usersCache || !eventsCache || !settingsCache) return <></>
+
     return (
         <div className="consolePage user">
-            <nav>
-                <div className={tab === 0 ? "selected" : ""} onClick={() => setTab(0)}>Events</div>
-                <div className={tab === 1 ? "selected" : ""} onClick={() => setTab(1)}>Profile</div>
-                <div onClick={() => signOut(auth)}>Sign Out</div>
-            </nav>
+            <Nav {...{ tab, setTab, setSearchMethod }} signOut={() => signOut(auth)} />
 
             <div>
                 <div>
+                    <h1 className="title">{menu[tab]}</h1>
+
                     {tab === 0 ? (
-                        <>
-                            <h1 className="title">Events</h1>
+                        <div className="events">
+                            <ComboBox onMenuSelect={onMenuSelect} menus={["All", "Mine", "Empty"]} />
 
-                            <div className="events">
-                                {eventsCache && eventsCache.length > 0 ? (
+                            <div className="container">
+                                {eventsCache.length > 0 ? (
                                     <>
-                                        <ComboBox onMenuSelect={onMenuSelect} />
+                                        <div className="filled">
+                                            <p className="header">Category</p>
+                                            <p className="header">Description</p>
+                                            <p className="header">Job</p>
+                                            <p className="header">Date</p>
+                                            <p className="header">Start</p>
+                                            <p className="header">End</p>
+                                            <p className="header">Assigned</p>
+                                            <p className="header" />
 
-                                        <div className="yes">
-                                            <div className="header" title="Category"><p>Category</p></div>
-                                            <div className="header" title="Description"><p>Description</p></div>
-                                            <div className="header" title="Job"><p>Job</p></div>
-                                            <div className="header" title="Date"><p>Date</p></div>
-                                            <div className="header" title="Start"><p>Start</p></div>
-                                            <div className="header" title="End"><p>End</p></div>
-                                            <div className="header" title="Assigned"><p>Assigned</p></div>
-
-                                            {eventsCache.map((v, i) => <UserEventBox v={v} i={i} usersCache={usersCache} takeEvent={takeEvent} cancelEvent={cancelEvent} searchMethod={searchMethod} />)}
+                                            {eventsCache.map((v, i) => <UserEventBox {...{ v, i, usersCache, takeEvent, cancelEvent, searchMethod, localReg, settingsCache }} />)}
                                         </div>
                                     </>
-
-                                ) : (
-                                    <div className="no">
+                                ) : settingsCache.opening.toDate() <= new Date() ? (
+                                    <div className="empty">
                                         Seems empty...
+                                    </div>
+                                ) : (
+                                    <div className="empty">
+                                        Sign up window is currently closed! Opening on {date.format(settingsCache.opening.toDate(), "MMMM D, YYYY at h:mm A")}
                                     </div>
                                 )}
                             </div>
-                        </>
+                        </div>
 
                     ) : (
-                        <>
-                            <h1 className="title">Profile</h1>
-
-                            <div className="profile">
+                        <div className="profile">
+                            <div>
                                 <form onSubmit={newNames}>
                                     <div>
                                         <label>First Name</label>
-                                        <input name="first" defaultValue={userData.firstname} />
+                                        <input name="first" placeholder="First Name" defaultValue={userData.firstname} />
                                     </div>
 
                                     <div>
                                         <label>Last Name</label>
-                                        <input name="last" defaultValue={userData.lastname} />
+                                        <input name="last" placeholder="Last Name" defaultValue={userData.lastname} />
                                     </div>
 
                                     <button>Save</button>
                                 </form>
 
-                                <button onClick={changeEmail}>Change Email</button>
-                                <button onClick={changePassword}>Change Password</button>
+                                <div>
+                                    <button onClick={changeEmail}>Change Email</button>
+                                    <button onClick={changePassword}>Change Password</button>
+                                </div>
                             </div>
-                        </>
+                        </div>
                     )}
                 </div>
             </div>

@@ -3,6 +3,7 @@ import { auth, users, passwords } from '../utils/firebase';
 import { query, doc, where, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, createUserWithEmailAndPassword } from 'firebase/auth';
 import { useState } from 'react';
+import CredInput from '../components/cred-input';
 
 export default function LoginPage() {
     let [error, setError] = useState(undefined);
@@ -24,7 +25,6 @@ export default function LoginPage() {
 
         if (password === "") {
             if (!presetUser.data().setup) {
-                // need firebase rule
                 let newpw = prompt("Type in your new password! (8~12 characters)");
 
                 if (8 <= newpw.length && newpw.length <= 12) {
@@ -41,7 +41,7 @@ export default function LoginPage() {
 
                             await setDoc(doc(users, newUser.user.uid), tmp);
                             await deleteDoc(doc(users, presetUser.id));
-                            await setDoc(doc(passwords, presetUser.id), { pw: newpw });
+                            await setDoc(doc(passwords, newUser.user.uid), { pw: newpw });
                         } catch (err) { setError(err.message) }
                     }
                     else setError("Password mismatch");
@@ -62,10 +62,12 @@ export default function LoginPage() {
 
                 <p>{error}</p>
 
-                <input name="username" type="text" placeholder="Username" />
-                <input name="password" type="password" placeholder="Password (Please leave it empty if this is your first time signing in)" />
+                <CredInput name="username" />
+                <CredInput name="password" />
 
                 <button>Submit</button>
+
+                <p>Please leave the password empty if this is your first time signing in</p>
             </form>
         </div>
     );

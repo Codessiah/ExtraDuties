@@ -1,8 +1,8 @@
 import './App.scss';
 
 // Packages
-import { auth, users, roles } from './utils/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth, users, roles, passwords } from './utils/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Switch } from 'react-router-dom';
@@ -41,6 +41,8 @@ export default function App() {
         setUser(undefined);
         setUserData(undefined);
         setUserRole(undefined);
+
+        document.title = "Cen10 Extra Duties";
     }
 
     return (
